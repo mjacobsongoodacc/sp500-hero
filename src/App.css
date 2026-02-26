@@ -1,0 +1,272 @@
+/* ================================================================
+   SP500 Hero — Global Styles
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a1f2e;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --accent-green: #00e676;
+  --accent-red: #ff1744;
+  --accent-blue: #42a5f5;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ---- Page layout -------------------------------------------------------- */
+
+.sp-hero-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.sp-header h1 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.sp-subtitle {
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.5);
+}
+
+/* ---- Chart area --------------------------------------------------------- */
+
+.chart-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.chart-area canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Superhero ---------------------------------------------------------- */
+
+.superhero-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 80px;
+  pointer-events: none;
+  z-index: 10;
+  will-change: transform, opacity;
+  transition: opacity 0.3s ease;
+  transform-origin: center center;
+}
+
+.superhero-bob {
+  animation: heroBob 3s ease-in-out infinite;
+}
+
+.superhero-bob.paused {
+  animation-play-state: paused;
+}
+
+.superhero-svg {
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.4));
+}
+
+.hero-cape {
+  transform-origin: 62px 38px;
+  animation: capeSway 2.5s ease-in-out infinite;
+}
+
+@keyframes heroBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes capeSway {
+  0%,
+  100% {
+    transform: rotate(0deg) scaleY(1);
+  }
+  30% {
+    transform: rotate(4deg) scaleY(1.06);
+  }
+  70% {
+    transform: rotate(-3deg) scaleY(0.94);
+  }
+}
+
+/* ---- Zoom controls ------------------------------------------------------ */
+
+.zoom-controls {
+  position: absolute;
+  bottom: 14px;
+  right: 86px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 20;
+}
+
+.zoom-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.zoom-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-btn:active {
+  transform: scale(0.92);
+}
+
+.zoom-level {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: center;
+}
+
+/* ---- Price ticker ------------------------------------------------------- */
+
+.price-ticker {
+  height: 44px;
+  min-height: 44px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 0 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  user-select: none;
+}
+
+.ticker-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+}
+
+.ticker-price {
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+}
+
+.ticker-change {
+  font-size: 12px;
+}
+
+.ticker-change.up {
+  color: var(--accent-green);
+}
+
+.ticker-change.down {
+  color: var(--accent-red);
+}
+
+.ticker-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.ticker-status.live .status-dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+}
+
+.ticker-status.simulated .status-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.ticker-status.disconnected .status-dot {
+  background: var(--accent-red);
+}
+
+.ticker-status.closed .status-dot {
+  background: var(--text-secondary);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
