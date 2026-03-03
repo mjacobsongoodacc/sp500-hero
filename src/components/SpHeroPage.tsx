@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveApiPriceService } from '../services/PriceService';
 import { useLivePrice } from '../hooks/useLivePrice';
+import { useTrading } from '../hooks/useTrading';
 import { useAnimationFrame } from '../hooks/useAnimationFrame';
 import { drawChart, CHART } from '../utils/drawing';
 import { createCityState } from '../utils/cityscape';
@@ -8,6 +9,7 @@ import { isMarketOpen, getNextOpen, formatCountdown } from '../utils/marketHours
 import { Superhero } from './Superhero';
 import { PriceTicker } from './PriceTicker';
 import { ZoomControls } from './ZoomControls';
+import { TradingPanel } from './TradingPanel';
 
 const HERO_PX_W = 120;
 const HERO_PX_H = 80;
@@ -22,13 +24,20 @@ export function SpHeroPage() {
   const { candlesRef, currentCandleRef, priceRef, tickerData } =
     useLivePrice(service);
 
+  // ---- trading game --------------------------------------------------------
+  const { balance, position, trades, buy, sell, reset } = useTrading();
+  const [currentPriceState, setCurrentPriceState] = useState(0);
+
   // ---- market hours state ---------------------------------------------------
   const [marketOpen, setMarketOpen] = useState(() => isMarketOpen());
 
   useEffect(() => {
-    const id = setInterval(() => setMarketOpen(isMarketOpen()), 1000);
+    const id = setInterval(() => {
+      setMarketOpen(isMarketOpen());
+      if (priceRef.current > 0) setCurrentPriceState(priceRef.current);
+    }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [priceRef]);
 
   // ---- zoom state ----------------------------------------------------------
   const [zoom, setZoom] = useState(1);
@@ -210,6 +219,15 @@ export function SpHeroPage() {
             <Superhero />
           </div>
         </div>
+        <TradingPanel
+          balance={balance}
+          position={position}
+          trades={trades}
+          currentPrice={currentPriceState}
+          onBuy={buy}
+          onSell={sell}
+          onReset={reset}
+        />
         <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       </div>
 

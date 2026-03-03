@@ -16,11 +16,12 @@ export function useLivePrice(service: LivePriceService) {
     service.start((price, timestamp) => {
       priceRef.current = price;
 
-      // Bucket into 1-second candles
-      const second = Math.floor(timestamp / 1000) * 1000;
+      // Bucket into 15-second candles
+      const CANDLE_MS = 15_000;
+      const bucket = Math.floor(timestamp / CANDLE_MS) * CANDLE_MS;
       const cur = currentCandleRef.current;
 
-      if (!cur || cur.timestamp !== second) {
+      if (!cur || cur.timestamp !== bucket) {
         if (cur) {
           candlesRef.current.push({ ...cur });
           if (candlesRef.current.length > MAX_CANDLES) {
@@ -28,7 +29,7 @@ export function useLivePrice(service: LivePriceService) {
           }
         }
         currentCandleRef.current = {
-          timestamp: second,
+          timestamp: bucket,
           open: price,
           high: price,
           low: price,
