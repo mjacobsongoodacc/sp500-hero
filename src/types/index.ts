@@ -7,16 +7,21 @@ export interface Candle {
 }
 
 export interface TickerData {
+  symbol: string;
   price: number;
   change: number;
   changePercent: number;
+  volume: string;
   status: ConnectionStatus;
 }
 
-export type ConnectionStatus = 'live' | 'simulated' | 'disconnected';
+export type ConnectionStatus = 'live' | 'waiting' | 'gateway_down' | 'error' | 'disconnected';
 
 export interface LivePriceService {
-  start(onTick: (price: number, timestamp: number) => void): void;
+  start(
+    onTick: (price: number, timestamp: number) => void,
+    onStatusChange?: (status: ConnectionStatus) => void,
+  ): void;
   stop(): void;
   getStatus(): ConnectionStatus;
 }
@@ -37,3 +42,11 @@ export interface DrawParams {
   heroWidth: number;
   currentPrice: number;
 }
+
+export type CandleInterval = 15_000 | 30_000 | 60_000;
+
+export const CANDLE_INTERVALS: { label: string; ms: CandleInterval }[] = [
+  { label: '15s', ms: 15_000 },
+  { label: '30s', ms: 30_000 },
+  { label: '1m', ms: 60_000 },
+];

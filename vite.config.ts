@@ -2,70 +2,141 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import ib from '@stoqey/ib'
 
-const { IBApi, EventName, Index } = ib
+const { IBApi, EventName, Index, Stock } = ib
 const TICK_LAST = 4
 const TICK_CLOSE = 9
 const TICK_DELAYED_LAST = 68
 
 const TWS_PORT = 7497
 const CLIENT_ID = 9001
+const STALE_SUBSCRIPTION_MS = 60_000
+
+interface Subscription {
+  reqId: number
+  price: number
+  lastPoll: number
+}
 
 function ibkrPlugin(): Plugin {
-  let price = 0
   let connected = false
-  let ib: InstanceType<typeof IBApi> | null = null
+  let api: InstanceType<typeof IBApi> | null = null
+  let nextReqId = 1
+  const subscriptions = new Map<string, Subscription>()
+  const reqIdToSymbol = new Map<number, string>()
+
+  function subscribe(symbol: string) {
+    if (subscriptions.has(symbol)) return
+    if (!api || !connected) return
+
+    const reqId = nextReqId++
+    subscriptions.set(symbol, { reqId, price: 0, lastPoll: Date.now() })
+    reqIdToSymbol.set(reqId, symbol)
+
+    api.reqMarketDataType(3)
+    if (symbol === 'SPX') {
+      api.reqMktData(reqId, new Index('SPX', 'USD', 'CBOE'), '', false, false)
+    } else {
+      api.reqMktData(reqId, new Stock(symbol, 'SMART', 'USD'), '', false, false)
+    }
+  }
+
+  function cleanupStale() {
+    const now = Date.now()
+    for (const [symbol, sub] of subscriptions) {
+      if (now - sub.lastPoll > STALE_SUBSCRIPTION_MS) {
+        if (api) api.cancelMktData(sub.reqId)
+        reqIdToSymbol.delete(sub.reqId)
+        subscriptions.delete(symbol)
+      }
+    }
+  }
 
   function connect() {
-    if (ib) return
+    if (api) return
 
-    ib = new IBApi({ port: TWS_PORT, clientId: CLIENT_ID })
+    api = new IBApi({ port: TWS_PORT, clientId: CLIENT_ID })
 
-    ib.on(EventName.connected, () => {
+    api.on(EventName.connected, () => {
       connected = true
       console.log('[IBKR] connected to TWS on port', TWS_PORT)
-      // Type 3 = accept delayed data when live isn't subscribed
-      ib!.reqMarketDataType(3)
-      ib!.reqMktData(1, new Index('SPX', 'USD', 'CBOE'), '', false, false)
     })
 
-    ib.on(EventName.disconnected, () => {
+    api.on(EventName.disconnected, () => {
       connected = false
       console.log('[IBKR] disconnected')
-      ib = null
+      api = null
+      subscriptions.clear()
+      reqIdToSymbol.clear()
     })
 
-    ib.on(EventName.error, (err: Error, code: number, reqId: number) => {
-      // Non-fatal: data-farm status (2104/2106/2158), delayed-data notice (10167),
-      // market-data-not-subscribed (354) — we fall back to delayed automatically
+    api.on(EventName.error, (err: Error, code: number, reqId: number) => {
       const ignore = [2104, 2106, 2158, 354, 10167]
       if (ignore.includes(code)) return
       console.error(`[IBKR] error ${code} (reqId ${reqId}):`, err.message)
     })
 
-    ib.on(
+    api.on(
       EventName.tickPrice,
-      (reqId: number, tickType: number, p: number) => {
-        if (reqId !== 1) return
+      (_reqId: number, tickType: number, p: number) => {
         if (
           tickType === TICK_LAST ||
           tickType === TICK_DELAYED_LAST ||
           tickType === TICK_CLOSE
         ) {
-          if (p > 0) price = p
+          if (p > 0) {
+            const symbol = reqIdToSymbol.get(_reqId)
+            if (symbol) {
+              const sub = subscriptions.get(symbol)
+              if (sub) sub.price = p
+            }
+          }
         }
       },
     )
 
-    ib.connect()
+    api.connect()
+    setInterval(cleanupStale, 30_000)
   }
 
   return {
-    name: 'ibkr-sp500',
+    name: 'ibkr-stocks',
     configureServer(server) {
       connect()
 
+      // Legacy SPX endpoint
       server.middlewares.use('/api/sp500', (_req, res) => {
         res.setHeader('Content-Type', 'application/json')
+        subscribe('SPX')
+        const sub = subscriptions.get('SPX')
+        if (sub) sub.lastPoll = Date.now()
+        const price = sub?.price ?? 0
+        if (price > 0) {
+          res.end(JSON.stringify({ price }))
+        } else {
+          res.statusCode = connected ? 200 : 502
+          res.end(
+            JSON.stringify(
+              connected
+                ? { price: 0, waiting: true }
+                : { error: 'not connected to TWS' },
+            ),
+          )
+        }
+      })
+
+      // Per-symbol stock endpoint
+      server.middlewares.use((req, res, next) => {
+        const match = req.url?.match(/^\/api\/stock\/([A-Z0-9.]+)$/)
+        if (!match) return next()
+
+        const symbol = match[1]
+        res.setHeader('Content-Type', 'application/json')
+
+        subscribe(symbol)
+        const sub = subscriptions.get(symbol)
+        if (sub) sub.lastPoll = Date.now()
+        const price = sub?.price ?? 0
+
         if (price > 0) {
           res.end(JSON.stringify({ price }))
         } else {
@@ -81,10 +152,12 @@ function ibkrPlugin(): Plugin {
       })
 
       server.httpServer?.on('close', () => {
-        if (ib) {
-          ib.cancelMktData(1)
-          ib.disconnect()
-          ib = null
+        if (api) {
+          for (const [, sub] of subscriptions) {
+            api.cancelMktData(sub.reqId)
+          }
+          api.disconnect()
+          api = null
         }
       })
     },
